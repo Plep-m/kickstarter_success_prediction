@@ -1,16 +1,15 @@
 from tp_ia.data.dataset import Dataset
+from tp_ia.training import DEFAULT_MODELS, Experiment
 
 
 def main():
-    dataset = Dataset("breast_cancer", test_fraction=0.15, validation_fraction=0.15)
-
-    print("--- Complete Dataset Overview ---")
+    dataset = Dataset("breast_cancer")
     print(dataset)
+    print()
 
-    print("--- Splitting Verification ---")
-    print(f"Train features shape:      {dataset.training.features.shape}")
-    print(f"Validation features shape: {dataset.validation.features.shape}")
-    print(f"Test features shape:       {dataset.testing.features.shape}")
+    experiment = Experiment(dataset, DEFAULT_MODELS)
+    experiment.run()
+    print(experiment)
 
 
 if __name__ == "__main__":

@@ -1,5 +1,6 @@
 from dataclasses import dataclass
-from typing import Literal, Callable
+from typing import Callable, Literal
+
 import numpy as np
 from sklearn import datasets
 from sklearn.model_selection import train_test_split
@@ -55,7 +56,9 @@ class Dataset:
 
         self._create_splits(test_fraction, validation_fraction, random_seed)
 
-    def _create_splits(self, test_fraction: float, validation_fraction: float, random_seed: int | None) -> None:
+    def _create_splits(
+        self, test_fraction: float, validation_fraction: float, random_seed: int | None
+    ) -> None:
         use_balanced_split = self._all_labels if len(np.unique(self._all_labels)) > 1 else None
 
         temp_features, test_features, temp_labels, test_labels = train_test_split(
