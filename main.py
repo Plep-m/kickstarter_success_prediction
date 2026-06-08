@@ -1,9 +1,12 @@
-from tp_ia.data.loader import load_dataset
+from tp_ia.data import Dataset
 
 
 def main():
-    X, _ = load_dataset("iris")
-    print(f"Shape: {X.shape}")
+    dataset = Dataset("breast_cancer")
+
+    X, y = dataset.X, dataset.y
+
+    print(dataset)
 
 
 if __name__ == "__main__":
