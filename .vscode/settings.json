@@ -1,0 +1,19 @@
+{
+  "files.exclude": {
+    "**/__pycache__": true,
+    "**/*.pyc": true,
+    "**/.pytest_cache": true,
+    "**/.ruff_cache": true,
+    "**/.coverage": true,
+    "**/*.egg-info": true,
+    ".venv": true,
+    "uv.lock": true,
+    "**/.codegraph": true
+  },
+  "search.exclude": {
+    "**/__pycache__": true,
+    ".venv": true,
+    "uv.lock": true,
+    "**/.codegraph": true
+  }
+}
