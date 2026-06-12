@@ -5,20 +5,13 @@ description = "ML/DL toolbox with hexagonal architecture — sklearn hidden behi
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
-    "fastapi>=0.136.3",
     "matplotlib>=3.10.9",
     "pandas>=3.0.3",
     "scikit-learn>=1.9.0",
-    "scipy>=1.17.1",
     "seaborn>=0.13.2",
-    "statsmodels>=0.14.6",
-    "uvicorn[standard]>=0.49.0",
+    "streamlit>=1.40.0",
     "xgboost>=3.2.0",
 ]
-
-[project.optional-dependencies]
-api = ["flask>=3.0.0"]
-serial = ["joblib>=1.4.0"]
 
 [build-system]
 requires = ["setuptools>=68"]
@@ -32,11 +25,8 @@ packages = [
     "mltoolbox.ports",
     "mltoolbox.adapters",
     "mltoolbox.adapters.sklearn",
-    "mltoolbox.adapters.keras",
-    "mltoolbox.adapters.joblib",
     "mltoolbox.services",
     "mltoolbox.data",
-    "mltoolbox.neural",
 ]
 
 [dependency-groups]

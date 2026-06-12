@@ -1,41 +1,29 @@
-from mltoolbox.adapters.sklearn import (
-    SklearnDatasetAdapter,
-    StratifiedSplitterAdapter,
-    StandardScalerAdapter,
-    LogisticRegressionAdapter,
-    RandomForestClassifierAdapter,
-    StratifiedKFoldAdapter,
-)
-from mltoolbox.services import Experiment, CrossValidator, BootstrapEvaluator, MetierReporter
+from sklearn.model_selection import train_test_split
+
+from mltoolbox._metrics import f1_score
+from mltoolbox.adapters.sklearn import kickstarter_pipelines
+from mltoolbox.data import KickstarterLoader, KickstarterCleaner
+from mltoolbox.services.benchmark import Benchmark
+
 
 def main() -> None:
-    X, y = SklearnDatasetAdapter("breast_cancer").load()
+    df = KickstarterLoader("data").load()
+    X, y = KickstarterCleaner().build(df)
+    print(f"Kickstarter: {len(X):,} rows  |  {y.mean():.1%} success rate")
 
-    split = StratifiedSplitterAdapter().split(X, y)
-    scaler = StandardScalerAdapter()
-    split.train = split.train.__class__(scaler.fit_transform(split.train.features), split.train.labels)
-    split.val   = split.val.__class__(scaler.transform(split.val.features),   split.val.labels)
-    split.test  = split.test.__class__(scaler.transform(split.test.features), split.test.labels)
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42, stratify=y
+    )
 
-    models = {
-        "logistic_regression": LogisticRegressionAdapter(scale=False),
-        "random_forest":       RandomForestClassifierAdapter(n_estimators=100),
-    }
-
-    print("=== Experiment ===")
-    print(Experiment(split, models).run())
-
-    print("\n=== Cross-validation ===")
-    print(CrossValidator(StratifiedKFoldAdapter(k=5)).evaluate(LogisticRegressionAdapter(), X, y))
-
-    print("\n=== Bootstrap ===")
-    print(BootstrapEvaluator(RandomForestClassifierAdapter(n_estimators=50), n_iterations=20).evaluate(X, y))
-
-    print("\n=== Metier ===")
-    lr = LogisticRegressionAdapter()
-    lr.fit(split.train.features, split.train.labels)
-    reporter = MetierReporter(cost_fn=10, cost_fp=1)
-    print(reporter.report(split.test.labels, lr.predict(split.test.features), "logistic"))
+    bench = (
+        Benchmark(
+            X_train, X_test, y_train, y_test,
+            metric_fn=lambda yt, yp: f1_score(yt, yp, average="weighted"),
+        )
+        .register_many(kickstarter_pipelines())
+        .run()
+    )
+    print(bench)
 
 
 if __name__ == "__main__":

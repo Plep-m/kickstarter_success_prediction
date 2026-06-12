@@ -27,13 +27,14 @@ class CrossValidator:
         self._score_fn = _SCORING_FNS[scoring]
 
     def evaluate(
-        self, model: ClassifierPort, X: np.ndarray, y: np.ndarray
+        self, model: ClassifierPort, X, y
     ) -> CrossValResult:
         scores: list[float] = []
+        _sel = lambda arr, idx: arr.iloc[idx] if hasattr(arr, "iloc") else arr[idx]
         for train_idx, test_idx in self._kfold.splits(X, y):
             m = copy.deepcopy(model)
-            m.fit(X[train_idx], y[train_idx])
-            scores.append(float(self._score_fn(y[test_idx], m.predict(X[test_idx]))))
+            m.fit(_sel(X, train_idx), _sel(y, train_idx))
+            scores.append(float(self._score_fn(_sel(y, test_idx), m.predict(_sel(X, test_idx)))))
         arr = np.array(scores)
         return CrossValResult(
             scores=tuple(float(s) for s in arr),
