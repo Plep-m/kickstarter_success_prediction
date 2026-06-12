@@ -41,7 +41,7 @@ class MetierReporter:
         model_name: str,
     ) -> MetierMetrics:
         """Compute metrics and business cost for one model."""
-        tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
+        _, fp, fn, _ = confusion_matrix(y_true, y_pred).ravel()
         return MetierMetrics(
             model_name=model_name,
             precision=float(precision_score(y_true, y_pred, zero_division=0)),
