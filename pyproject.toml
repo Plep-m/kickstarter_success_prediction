@@ -1,7 +1,7 @@
 [project]
-name = "mltoolbox"
+name = "kickstarter-predictor"
 version = "0.1.0"
-description = "ML/DL toolbox with hexagonal architecture — sklearn hidden behind ports"
+description = "Predict whether a Kickstarter campaign will succeed"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
@@ -13,31 +13,14 @@ dependencies = [
     "xgboost>=3.2.0",
 ]
 
-[build-system]
-requires = ["setuptools>=68"]
-build-backend = "setuptools.build_meta"
-
-[tool.setuptools]
-package-dir = {"mltoolbox" = "src"}
-packages = [
-    "mltoolbox",
-    "mltoolbox.domain",
-    "mltoolbox.ports",
-    "mltoolbox.adapters",
-    "mltoolbox.adapters.sklearn",
-    "mltoolbox.services",
-    "mltoolbox.data",
-]
+# Plain scripts, not an installable package.
+[tool.uv]
+package = false
 
 [dependency-groups]
-dev = [
-    "setuptools>=68",
-    "ruff>=0.15.16",
-    "httpx2>=2.4.0",
-]
+dev = ["ruff>=0.15.16"]
 
 [tool.ruff]
-src = ["src"]
 line-length = 100
 
 [tool.ruff.lint]

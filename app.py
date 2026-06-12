@@ -8,12 +8,8 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 import streamlit as st
-from sklearn.model_selection import train_test_split
 
-from mltoolbox._metrics import accuracy_score, f1_score
-from mltoolbox.adapters.sklearn import kickstarter_pipelines
-from mltoolbox.adapters.sklearn.pipelines import SklearnPipelineAdapter
-from mltoolbox.data import KickstarterCleaner, KickstarterLoader
+from src import data, models
 
 # ── page config ───────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -26,8 +22,7 @@ st.set_page_config(
 
 @st.cache_data(show_spinner="Loading dataset…")
 def load_data() -> tuple[pd.DataFrame, pd.Series]:
-    df = KickstarterLoader("data").load()
-    return KickstarterCleaner().build(df)
+    return data.load_clean("data")
 
 
 @st.cache_data(show_spinner=False)
@@ -36,20 +31,12 @@ def get_options(X: pd.DataFrame) -> tuple[list[str], list[str]]:
 
 
 @st.cache_resource(show_spinner="Training model…")
-def train_model(model_name: str) -> tuple[SklearnPipelineAdapter, dict[str, float]]:
+def train_model(model_name: str):
     X, y = load_data()
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42, stratify=y
-    )
-    pipeline = kickstarter_pipelines()[model_name]
+    X_train, X_test, y_train, y_test = models.split(X, y)
+    pipeline = models.build_models()[model_name]
     pipeline.fit(X_train, y_train)
-    y_pred = pipeline.predict(X_test)
-    metrics = {
-        "accuracy": float(accuracy_score(y_test, y_pred)),
-        "f1_weighted": float(f1_score(y_test, y_pred, average="weighted")),
-        "f1_success": float(f1_score(y_test, y_pred, average="binary", pos_label=1)),
-    }
-    return pipeline, metrics
+    return pipeline, models.evaluate(pipeline, X_test, y_test)
 
 
 # ── sidebar ───────────────────────────────────────────────────────────────────

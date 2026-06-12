@@ -1,29 +1,19 @@
-from sklearn.model_selection import train_test_split
+"""Benchmark the three models on the Kickstarter dataset.
 
-from mltoolbox._metrics import f1_score
-from mltoolbox.adapters.sklearn import kickstarter_pipelines
-from mltoolbox.data import KickstarterLoader, KickstarterCleaner
-from mltoolbox.services.benchmark import Benchmark
+Run with: python main.py
+"""
+from src import data, models
 
 
 def main() -> None:
-    df = KickstarterLoader("data").load()
-    X, y = KickstarterCleaner().build(df)
-    print(f"Kickstarter: {len(X):,} rows  |  {y.mean():.1%} success rate")
+    X, y = data.load_clean()
+    print(f"Kickstarter: {len(X):,} rows  |  {y.mean():.1%} success rate\n")
 
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42, stratify=y
-    )
+    X_train, X_test, y_train, y_test = models.split(X, y)
 
-    bench = (
-        Benchmark(
-            X_train, X_test, y_train, y_test,
-            metric_fn=lambda yt, yp: f1_score(yt, yp, average="weighted"),
-        )
-        .register_many(kickstarter_pipelines())
-        .run()
-    )
-    print(bench)
+    print("Leaderboard (weighted F1):")
+    for name, f1 in models.benchmark(X_train, X_test, y_train, y_test):
+        print(f"  {name:<22} {f1:.4f}")
 
 
 if __name__ == "__main__":
