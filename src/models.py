@@ -1,4 +1,8 @@
-"""Math layer — preprocessing, the ML models, training and scoring.
+"""Math layer — preprocessing, models, cross-validation and scoring.
+
+Mirrors the modelling and evaluation phases of the CRISP-DM notebooks:
+5-fold stratified cross-validation with five metrics, then a final hold-out
+evaluation (accuracy, precision, recall, F1, AUC-ROC) and feature importance.
 
 Everything sklearn/xgboost lives here. The business layer (`data`) knows nothing
 about machine learning; this layer knows nothing about Kickstarter beyond the
@@ -11,13 +15,26 @@ from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import accuracy_score, f1_score
+from sklearn.metrics import (
+    accuracy_score,
+    f1_score,
+    precision_score,
+    recall_score,
+    roc_auc_score,
+)
+from sklearn.model_selection import StratifiedKFold
+from sklearn.model_selection import cross_validate as sk_cross_validate
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from xgboost import XGBClassifier
 
 from .data import CATEGORICAL, NUMERIC
+
+RANDOM_STATE = 42
+
+# The five metrics tracked in the notebooks (Phase 4 & 5).
+SCORING = ["accuracy", "precision", "recall", "f1", "roc_auc"]
 
 
 def _preprocessor() -> ColumnTransformer:
@@ -34,8 +51,12 @@ def _preprocessor() -> ColumnTransformer:
     ])
 
 
-def build_models(random_state: int = 42) -> dict[str, Pipeline]:
-    """The three classifiers, each a full preprocessing + model pipeline."""
+def build_models(random_state: int = RANDOM_STATE, pos_weight: float = 1.5) -> dict[str, Pipeline]:
+    """The three classifiers, each a full preprocessing + model pipeline.
+
+    `pos_weight` is XGBoost's scale_pos_weight (≈ #failures / #successes). Pass
+    `class_balance(y_train)` to reproduce the notebook's data-driven value.
+    """
     return {
         "logistic_regression": Pipeline([
             ("prep", _preprocessor()),
@@ -54,34 +75,74 @@ def build_models(random_state: int = 42) -> dict[str, Pipeline]:
             ("prep", _preprocessor()),
             ("clf", XGBClassifier(
                 n_estimators=300, max_depth=6, learning_rate=0.1,
-                subsample=0.8, colsample_bytree=0.8, scale_pos_weight=1.5,
+                subsample=0.8, colsample_bytree=0.8, scale_pos_weight=pos_weight,
                 eval_metric="logloss", n_jobs=-1, verbosity=0, random_state=random_state,
             )),
         ]),
     }
 
 
-def split(X: pd.DataFrame, y: pd.Series, test_size: float = 0.2, random_state: int = 42):
+def class_balance(y: pd.Series) -> float:
+    """#negatives / #positives — the data-driven scale_pos_weight for XGBoost."""
+    return float((y == 0).sum() / (y == 1).sum())
+
+
+def split(X: pd.DataFrame, y: pd.Series, test_size: float = 0.2, random_state: int = RANDOM_STATE):
     """Stratified train/test split — the one split both entry points share."""
     return train_test_split(
         X, y, test_size=test_size, random_state=random_state, stratify=y
     )
 
 
-def evaluate(model: Pipeline, X_test: pd.DataFrame, y_test: pd.Series) -> dict[str, float]:
-    """Accuracy and F1 (weighted + success-class) for a fitted model."""
+def cross_validate(X, y, n_splits: int = 5, random_state: int = RANDOM_STATE) -> pd.DataFrame:
+    """5-fold stratified CV (Phase 4): mean of each metric per model, on the train set."""
+    cv = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+    rows = []
+    for name, model in build_models().items():
+        scores = sk_cross_validate(model, X, y, cv=cv, scoring=SCORING, n_jobs=-1)
+        row = {"model": name}
+        for metric in SCORING:
+            row[metric] = scores[f"test_{metric}"].mean()
+            row[f"{metric}_std"] = scores[f"test_{metric}"].std()
+        rows.append(row)
+    return pd.DataFrame(rows).set_index("model")
+
+
+def evaluate(model: Pipeline, X_test, y_test) -> dict[str, float]:
+    """All five metrics for one fitted model (Phase 5)."""
     y_pred = model.predict(X_test)
+    y_proba = model.predict_proba(X_test)[:, 1]
     return {
         "accuracy": float(accuracy_score(y_test, y_pred)),
-        "f1_weighted": float(f1_score(y_test, y_pred, average="weighted")),
-        "f1_success": float(f1_score(y_test, y_pred, average="binary", pos_label=1)),
+        "precision": float(precision_score(y_test, y_pred)),
+        "recall": float(recall_score(y_test, y_pred)),
+        "f1": float(f1_score(y_test, y_pred)),
+        "roc_auc": float(roc_auc_score(y_test, y_proba)),
     }
 
 
-def benchmark(X_train, X_test, y_train, y_test) -> list[tuple[str, float]]:
-    """Fit every model, score weighted F1, return (name, score) sorted best-first."""
-    scores = []
+def benchmark(X_train, X_test, y_train, y_test) -> tuple[pd.DataFrame, dict[str, Pipeline]]:
+    """Fit every model, evaluate on test, return (results sorted by AUC, fitted models)."""
+    fitted: dict[str, Pipeline] = {}
+    rows = []
     for name, model in build_models().items():
         model.fit(X_train, y_train)
-        scores.append((name, evaluate(model, X_test, y_test)["f1_weighted"]))
-    return sorted(scores, key=lambda r: r[1], reverse=True)
+        fitted[name] = model
+        rows.append({"model": name, **evaluate(model, X_test, y_test)})
+    table = pd.DataFrame(rows).set_index("model").sort_values("roc_auc", ascending=False)
+    return table, fitted
+
+
+def feature_importances(pipeline: Pipeline, top_n: int = 15) -> pd.Series:
+    """Tree-model importances mapped back to the encoded feature names (Phase 5.1).
+
+    Works for random_forest and xgboost (logistic_regression has no importances_).
+    """
+    prep = pipeline.named_steps["prep"]
+    clf = pipeline.named_steps["clf"]
+    names = prep.get_feature_names_out()
+    return (
+        pd.Series(clf.feature_importances_, index=names)
+        .sort_values(ascending=False)
+        .head(top_n)
+    )

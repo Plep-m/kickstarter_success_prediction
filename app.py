@@ -52,9 +52,12 @@ with st.sidebar:
     try:
         pipeline, test_metrics = train_model(model_name)
         st.success("Model ready")
-        st.metric("Test accuracy",   f"{test_metrics['accuracy']:.3f}")
-        st.metric("Test F1 (weighted)", f"{test_metrics['f1_weighted']:.3f}")
-        st.metric("Test F1 (success)",  f"{test_metrics['f1_success']:.3f}")
+        c1, c2 = st.columns(2)
+        c1.metric("Accuracy",  f"{test_metrics['accuracy']:.3f}")
+        c2.metric("AUC-ROC",   f"{test_metrics['roc_auc']:.3f}")
+        c1.metric("Precision", f"{test_metrics['precision']:.3f}")
+        c2.metric("Recall",    f"{test_metrics['recall']:.3f}")
+        st.metric("F1 (succès)", f"{test_metrics['f1']:.3f}")
     except FileNotFoundError as exc:
         st.error(str(exc))
         st.stop()
